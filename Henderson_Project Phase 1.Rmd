@@ -1,0 +1,176 @@
+---
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+##Phase 1 Project - Failure
+
+
+Libraries
+```{r}
+options(tidyverse.quiet = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(tidymodels)
+library(mice) #package for imputation
+library(VIM) #visualizing missingness
+library(naniar) #visualizing missingness
+library(skimr) #alternative way to view dataset summaries
+library(UpSetR) #visualizing missingness
+library(caret)
+library(skimr)
+library(GGally)
+library(gridExtra)
+library(vip) #variable importance
+```
+Read in the data
+```{r}
+product = read_csv("train.csv")
+```
+Structure and summary
+```{r}
+str(product)
+summary(product)
+skim(product)
+```
+Factor 
+```{r}
+product = product %>% mutate(product_code = as_factor(product_code)) %>% 
+  mutate(failure = fct_recode(failure, "No" = "0", "Yes" = "1" )) %>%
+  mutate(attribute_1 = as_factor(attribute_1)) %>%
+  mutate(attribute_0 = as_factor(attribute_0))
+
+str(product)
+skim(product)
+```
+
+
+
+Simple view of missingess
+```{r}
+gg_miss_var(product)
+```
+
+By a factor
+```{r}
+gg_miss_fct(x = product, fct = failure)
+```
+```{r}
+vim_plot = aggr(product, numbers = TRUE, prop = c(TRUE, FALSE),cex.axis=.7)
+#the cex.axis reduces size of text on x-axis so labels fit better
+```
+
+
+Row-wise deletion of any row with at least one NA:
+```{r}
+productdel = product %>% drop_na() 
+#alternatively can specify which variable(s) on which to do the drop_na
+#drop_na(Age)
+skim(productdel)
+```
+
+```{r}
+gg_miss_fct(x = productdel, fct = failure)
+```
+
+Finally, imputation. Let's use the "mice" package to do imputation. 
+```{r}
+set.seed(1234) #sets seed for random number generator
+imp_failure = mice(product, m=5, method='pmm', printFlag=FALSE)
+#m is the number of imputations, 5 is a reasonable value as a default
+#pmm is "predictive mean matching" = imputation method for numeric data
+#printFlag reduces amount of output
+summary(imp_failure)
+```
+```{r}
+results_complete = complete(imp_failure) 
+summary(results_complete)
+```
+
+
+
+Now we'll split the data. 
+```{r}
+set.seed(123) 
+product_split = initial_split(product, prop = 0.7, strata = failure) #70% in training
+train = training(product_split)
+test = testing(product_split)
+```
+
+
+Visualization
+
+
+```{r}
+ggplot(train, aes(x=failure, fill = product_code)) + geom_bar() + theme_bw()
+```
+```{r}
+ggplot(train, aes(x=failure, fill = attribute_0)) + geom_bar() + theme_bw()
+```
+
+```{r}
+ggplot(train, aes(x=failure, fill = attribute_1)) + geom_bar() + theme_bw()
+```
+
+
+
+```{r}
+t2 = table(train$failure, train$product_code) #create a table object
+prop.table(t2, margin = 2 ) #crosstab with proportions
+```
+``
+```{r}
+p1 = ggplot(train, aes(x = id, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = product_code, fill = failure)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = loading, fill = failure)) + geom_bar(position = "fill")
+p4 = ggplot(train, aes(x = attribute_0, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3,p4)
+```
+
+`
+```{r}
+p1 = ggplot(train, aes(x = attribute_1, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = attribute_2, fill = failure)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = attribute_3, fill = failure)) + geom_bar(position = "fill")
+p4 = ggplot(train, aes(x = measurement_0, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = measurement_1, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = measurement_2, fill = failure)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = measurement_3, fill = failure)) + geom_bar(position = "fill")
+p4 = ggplot(train, aes(x = measurement_4, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3,p4)
+```
+```{r}
+p1 = ggplot(train, aes(x = measurement_5, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = measurement_6, fill = failure)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = measurement_7, fill = failure)) + geom_bar(position = "fill")
+p4 = ggplot(train, aes(x = measurement_8, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = measurement_9, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = measurement_10, fill = failure)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = measurement_11, fill = failure)) + geom_bar(position = "fill")
+p4 = ggplot(train, aes(x = measurement_12, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3,p4)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = measurement_13, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = measurement_14, fill = failure)) + geom_bar(position = "fill")
+p3 = ggplot(train, aes(x = measurement_15, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2,p3)
+```
+
+```{r}
+p1 = ggplot(train, aes(x = measurement_16, fill = failure)) + geom_bar(position = "fill")
+p2 = ggplot(train, aes(x = measurement_17, fill = failure)) + geom_bar(position = "fill")
+grid.arrange(p1,p2)
+```
+
+

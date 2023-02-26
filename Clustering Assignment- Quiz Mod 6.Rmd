@@ -1,0 +1,144 @@
+## Clustering  
+
+Libraries
+```{r}
+options(tidyverse.quiet=TRUE)
+library(tidyverse)
+library(cluster) #algorithms for clustering
+library(factoextra) #visualization
+library(dendextend) #viewing clustering dendograms
+```
+
+
+Read in data
+```{r}
+trucks = read_csv("trucks.csv")
+str(trucks)
+summary(trucks)
+```
+Preparing the data.
+1. Remove missingness or impute missing values
+2.  Scale the data
+
+```{r}
+trucks = trucks %>% select(-Driver_ID) 
+str(trucks)
+summary(trucks)
+```
+
+Basic data that we generate as an example (modification of code borrowed from https://www.tidymodels.org/learn/statistics/k-means/)
+
+```{r}
+set.seed(27)
+centers = tibble(
+  cluster = factor(1:2), #two clusters
+  num_points = c(70, 120),  # number of points in each cluster
+  Distance = c(5, 0),              # x1 coordinate of cluster centers
+  Speeding = c(-1, 1)              # x2 coordinate of cluster centers
+)
+
+labelled_points = 
+  centers %>%
+  mutate(
+    Distance = map2(num_points, Distance, rnorm), #randomly generate points for each cluster for x1
+    Speeding = map2(num_points, Speeding, rnorm)  #randomly generate points for each cluster for x2
+  ) %>% 
+  select(-num_points) %>% 
+  unnest(cols = c(Distance, Speeding))
+
+ggplot(labelled_points, aes(Distance, Speeding, color = cluster)) +
+  geom_point(alpha = 0.4) + theme_bw()
+```
+
+
+```{r}
+kmeans_recipe = recipe(~ Distance + Speeding , trucks) 
+
+trucks_dummy = kmeans_recipe %>% 
+  step_dummy(all_nominal(), one_hot = TRUE) %>%
+  step_scale(all_numeric()) %>%
+  step_center(all_numeric()) 
+
+trucks_dummy = prep(trucks_dummy, trucks) #prepares the recipe
+
+trucks_cleaned = bake(trucks_dummy, trucks) #applies the recipe and yields a data frame
+```
+
+```{r}
+#we have two data frames now, one scaled and dummied and one with just row-wise deletion of missingness
+summary(trucks_cleaned)
+summary(trucks)
+```
+Perform k-means clustering with a pre-specified number of clusters. We use the scaled and dummied data frame. 
+
+```{r}
+set.seed(412)
+clusts = 
+  tibble(k = 1:8) %>%
+  mutate(
+    kclust = map(k, ~kmeans(trucks_cleaned, .x)),
+    tidied = map(kclust, tidy),
+    glanced = map(kclust, glance),
+    augmented = map(kclust, augment, trucks_cleaned)
+  )
+
+clusts
+```
+Create relevant objects 
+```{r}
+clusters = 
+  clusts %>%
+  unnest(cols = c(tidied))
+
+assignments = 
+  clusts %>% 
+  unnest(cols = c(augmented))
+
+clusterings = 
+  clusts %>%
+  unnest(cols = c(glanced))
+```
+
+```{r}
+p1 = 
+  ggplot(assignments, aes(x = Distance, y = Speeding)) +
+  geom_point(aes(color = .cluster), alpha = 0.8) + 
+  facet_wrap(~ k)
+p1
+```
+```{r}
+ggplot(clusterings, aes(k, tot.withinss)) +
+  geom_line() +
+  geom_point()
+```
+
+
+```{r}
+points = labelled_points %>% select(-cluster) #get rid of the cluster column
+
+set.seed(123)
+kclust = kmeans(points, centers = 2) #run k-means clustering with k = 3
+kclust #view results
+```
+
+
+Let's try 4
+```{r}
+set.seed(412)
+clusters = kmeans(trucks_cleaned, 4)
+```
+
+Attach cluster to dataset
+```{r}
+trucks = augment(clusters, trucks)
+str(trucks)
+```
+
+Plots
+```{r}
+ggplot(trucks, aes(x=Distance,y=Speeding,color=factor(.cluster))) + geom_point() + facet_wrap(~factor(Speeding))
+```
+
+
+
+
